@@ -4,16 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-cortex-m = "0.7"
-cortex-m-rt = "0.7"
-embedded-hal = "0.2.5"
-embedded-time = "0.12.0"
-log = "0.4.20"
+cortex-m = "0.7.7"
+cortex-m-rt = "0.7.3"
+embedded-hal = "1.0.0"
+embedded-time = "0.12.1"
+log = "0.4.21"
 panic-reset = "0.1.1"
-rp2040-hal = { version = "0.8", features = ["rt", "critical-section-impl"] }
+rp2040-hal = { version = "0.10.0", features = ["rt", "critical-section-impl"] }
 rp2040-boot2 = "0.2"
-usb-device = "0.2.8"
-usbd-serial = "0.1.1"
+usb-device = "0.3.2"
+usbd-serial = "0.2.1"
 critical-section = "1.1.2"
 
 [profile.release]
