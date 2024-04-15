@@ -4,7 +4,7 @@ use cortex_m::delay::Delay;
 use rp2040_hal::{clocks::init_clocks_and_plls, pac, usb::UsbBus, Clock, Sio, Watchdog};
 use usb_device::class_prelude::UsbBusAllocator;
 
-use crate::usb_manager::UsbManager;
+use crate::{pio::Pio, usb_manager::UsbManager};
 
 static mut SINGLETON: Option<Hardware> = None;
 
@@ -61,6 +61,52 @@ impl Hardware {
                 sio.gpio_bank0,
                 &mut pac.RESETS,
             );
+
+			let pio = Pio::new(pac.PIO0, pac.PIO1, &mut pac.RESETS);
+
+			let program = pio_proc::pio_asm!(
+				"set pindirs, 1
+
+				pull
+				mov y osr
+
+				.wrap_target
+
+				mov x y
+
+				color:
+				send_1:
+					set pins, 1 [19]
+					set pins, 0 [10]
+
+				// send_0:
+				// 	set pins, 1 [9]
+				// 	set pins, 0 [20]
+
+				jmp x-- color
+				mov x y
+
+				reset:
+					set pins, 0 [31]
+					set pins, 0 [31]
+					jmp x-- reset
+
+				.wrap"
+			).program;
+
+			let pin = (Some((2, 1)), None, None, None);
+			let clocks = (Some((5, 1)), None, None, None);
+
+			let (pio, (Some((_rx, mut tx)), _, _, _)) = pio.install_program_pio0(program, 1, pin, clocks).unwrap() else {
+				unreachable!();
+			};
+
+			let _pio = pio.start0().unwrap();
+
+			tx.write(24 * 300);
+
+			// // Uninitialize the state machine again, freeing the program.
+			// let (sm, installed) = sm.uninit(rx, tx);
 
             unsafe {
                 SINGLETON = Some(Hardware {

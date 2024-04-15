@@ -9,7 +9,9 @@ static BOOT_LOADER: [u8; 256] = rp2040_boot2::BOOT_LOADER_GENERIC_03H;
 extern crate cortex_m_rt;
 
 pub mod hardware;
+pub mod pio;
 pub mod serial_logger;
+pub mod state_machine;
 pub mod usb_manager;
 
 use hardware::Hardware;
