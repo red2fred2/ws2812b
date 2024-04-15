@@ -54,6 +54,22 @@ impl<PIO: PIOExt, SM: StateMachineIndex> StateMachine<PIO, SM> {
         return Ok((self, (rx, tx)))
     }
 
+	pub fn uninstall(mut self, rx: Rx<(PIO, SM)>, tx: Tx<(PIO, SM)>) -> Result<Self, Error> {
+		// Stop the machine if it's still running
+		if let StateMachineKind::Running(_) = &self.sm {
+			self = self.stop()?;
+		}
+
+		let StateMachineKind::Stopped(sm) = self.sm else {
+			return Err(Error::NoProgramToUninstall)
+		};
+
+		let (sm, _) = sm.uninit(rx, tx);
+
+		self.sm = StateMachineKind::Uninitialized(sm);
+		return Ok(self);
+	}
+
     pub fn start(mut self) -> Result<Self, Error> {
         let StateMachineKind::Stopped(sm) = self.sm else {
             return Err(Error::FailedToStart);
@@ -80,4 +96,5 @@ pub enum Error {
     ProgrammingFailed,
     FailedToStart,
     FailedToStop,
+	NoProgramToUninstall,
 }
