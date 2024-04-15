@@ -63,12 +63,21 @@ impl<PIO: PIOExt, SM: StateMachineIndex> StateMachine<PIO, SM> {
         self.sm = StateMachineKind::Running(sm);
         return Ok(self);
     }
+
+    pub fn stop(mut self) -> Result<Self, Error> {
+        let StateMachineKind::Running(sm) = self.sm else {
+            return Err(Error::FailedToStop);
+        };
+
+        let sm = sm.stop();
+        self.sm = StateMachineKind::Stopped(sm);
+        return Ok(self);
+    }
 }
 
 #[derive(Debug)]
 pub enum Error {
-    /// Failed to program state machine
     ProgrammingFailed,
-    /// Failed to start state machine
     FailedToStart,
+    FailedToStop,
 }
