@@ -241,6 +241,56 @@ impl Pio {
         return Ok((self, (rxtx0, rxtx1, rxtx2, rxtx3)));
     }
 
+    /// Uninstalls a program from PIO0
+    ///
+    /// * `rxtx` - The same rx and tx channels returned by install_program
+    ///
+    /// Returns a slice with the tx and rx for each state machine.
+    pub fn unininstall_program_pio0(
+        mut self,
+        rxtx: (Option<RxTx<PIO0, SM0>>, Option<RxTx<PIO0, SM1>>, Option<RxTx<PIO0, SM2>>, Option<RxTx<PIO0, SM3>>)
+    ) -> Result<Self, state_machine::Error> {
+		if let (Some((rx, tx)), _, _, _) = rxtx {
+			self.pio0sm0 = self.pio0sm0.uninstall(rx, tx)?;
+		}
+		if let (_, Some((rx, tx)), _, _) = rxtx {
+			self.pio0sm1 = self.pio0sm1.uninstall(rx, tx)?;
+		}
+		if let (_, _, Some((rx, tx)), _) = rxtx {
+			self.pio0sm2 = self.pio0sm2.uninstall(rx, tx)?;
+		}
+		if let (_, _, _, Some((rx, tx))) = rxtx {
+			self.pio0sm3 = self.pio0sm3.uninstall(rx, tx)?;
+		}
+
+		return Ok(self);
+    }
+
+	/// Uninstalls a program from PIO1
+    ///
+    /// * `rxtx` - The same rx and tx channels returned by install_program
+    ///
+    /// Returns a slice with the tx and rx for each state machine.
+    pub fn unininstall_program_pio1(
+        mut self,
+        rxtx: (Option<RxTx<PIO1, SM0>>, Option<RxTx<PIO1, SM1>>, Option<RxTx<PIO1, SM2>>, Option<RxTx<PIO1, SM3>>)
+    ) -> Result<Self, state_machine::Error> {
+		if let (Some((rx, tx)), _, _, _) = rxtx {
+			self.pio1sm0 = self.pio1sm0.uninstall(rx, tx)?;
+		}
+		if let (_, Some((rx, tx)), _, _) = rxtx {
+			self.pio1sm1 = self.pio1sm1.uninstall(rx, tx)?;
+		}
+		if let (_, _, Some((rx, tx)), _) = rxtx {
+			self.pio1sm2 = self.pio1sm2.uninstall(rx, tx)?;
+		}
+		if let (_, _, _, Some((rx, tx))) = rxtx {
+			self.pio1sm3 = self.pio1sm3.uninstall(rx, tx)?;
+		}
+
+		return Ok(self);
+    }
+
     /// Returns whether or not PIO block 0 is in use
     pub fn pio0_in_use(&self) -> bool {
         self.pio0sm0.is_initialized() |
@@ -295,6 +345,50 @@ impl Pio {
         }
         if self.pio1sm3.is_initialized() {
             let sm = self.pio1sm3.start()?;
+            self.pio1sm3 = sm;
+        }
+
+        Ok(self)
+    }
+
+    /// Starts the state machines in PIO0
+    pub fn stop0(mut self) -> Result<Self, state_machine::Error> {
+        if self.pio0sm0.is_initialized() {
+            let sm = self.pio0sm0.stop()?;
+            self.pio0sm0 = sm;
+        }
+        if self.pio0sm1.is_initialized() {
+            let sm = self.pio0sm1.stop()?;
+            self.pio0sm1 = sm;
+        }
+        if self.pio0sm2.is_initialized() {
+            let sm = self.pio0sm2.stop()?;
+            self.pio0sm2 = sm;
+        }
+        if self.pio0sm3.is_initialized() {
+            let sm = self.pio0sm3.stop()?;
+            self.pio0sm3 = sm;
+        }
+
+        Ok(self)
+    }
+
+    /// Starts the state machines in PIO1
+    pub fn stop1(mut self) -> Result<Self, state_machine::Error> {
+        if self.pio1sm0.is_initialized() {
+            let sm = self.pio1sm0.stop()?;
+            self.pio1sm0 = sm;
+        }
+        if self.pio1sm1.is_initialized() {
+            let sm = self.pio1sm1.stop()?;
+            self.pio1sm1 = sm;
+        }
+        if self.pio1sm2.is_initialized() {
+            let sm = self.pio1sm2.stop()?;
+            self.pio1sm2 = sm;
+        }
+        if self.pio1sm3.is_initialized() {
+            let sm = self.pio1sm3.stop()?;
             self.pio1sm3 = sm;
         }
 
