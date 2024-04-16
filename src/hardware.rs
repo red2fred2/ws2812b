@@ -1,7 +1,7 @@
 //! Handles most low level hardware abstraction
 
 use cortex_m::delay::Delay;
-use rp2040_hal::{clocks::init_clocks_and_plls, pac, usb::UsbBus, Clock, Sio, Watchdog};
+use rp2040_hal::{clocks::init_clocks_and_plls, gpio::{FunctionPio0, Pin}, pac, usb::UsbBus, Clock, Sio, Watchdog};
 use usb_device::class_prelude::UsbBusAllocator;
 
 use crate::{pio::Pio, usb_manager::UsbManager};
@@ -10,7 +10,7 @@ static mut SINGLETON: Option<Hardware> = None;
 
 pub struct Hardware {
     delay: Delay,
-    pins: rp2040_hal::gpio::Pins,
+    // pins: rp2040_hal::gpio::Pins,
     usb: Option<UsbManager>,
     usb_bus: UsbBusAllocator<UsbBus>,
 }
@@ -77,11 +77,11 @@ impl Hardware {
 				color:
 				send_1:
 					set pins, 1 [19]
-					set pins, 0 [10]
+					set pins, 0 [9]
 
 				// send_0:
 				// 	set pins, 1 [9]
-				// 	set pins, 0 [20]
+				// 	set pins, 0 [19]
 
 				jmp x-- color
 				mov x y
@@ -94,6 +94,8 @@ impl Hardware {
 				.wrap"
 			).program;
 
+			let _: Pin<_, FunctionPio0, _> = pins.gpio2.into_function();
+
 			let pin = (Some((2, 1)), None, None, None);
 			let clocks = (Some((5, 1)), None, None, None);
 
@@ -103,15 +105,12 @@ impl Hardware {
 
 			let _pio = pio.start0().unwrap();
 
-			tx.write(24 * 300);
-
-			// // Uninitialize the state machine again, freeing the program.
-			// let (sm, installed) = sm.uninit(rx, tx);
+			tx.write(24 * 15);
 
             unsafe {
                 SINGLETON = Some(Hardware {
                     delay,
-                    pins,
+                    // pins,
                     usb: None,
                     usb_bus,
                 });
@@ -132,9 +131,9 @@ impl Hardware {
         &mut self.delay
     }
 
-    pub fn get_pins(&mut self) -> &mut rp2040_hal::gpio::Pins {
-        &mut self.pins
-    }
+    // pub fn get_pins(&mut self) -> &mut rp2040_hal::gpio::Pins {
+    //     &mut self.pins
+    // }
 
     pub fn get_usb(&mut self) -> &mut UsbManager {
         // It should be impossible for this to be None, panic if it is
