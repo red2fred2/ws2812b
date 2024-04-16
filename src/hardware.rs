@@ -62,7 +62,9 @@ impl Hardware {
                 &mut pac.RESETS,
             );
 
-			let pio = Pio::new(pac.PIO0, pac.PIO1, &mut pac.RESETS);
+
+			let pio0 = Pio::new(pac.PIO0, &mut pac.RESETS);
+			let _pio1 = Pio::new(pac.PIO1, &mut pac.RESETS);
 
 			let program = pio_proc::pio_asm!(
 				"set pindirs, 1
@@ -99,13 +101,13 @@ impl Hardware {
 			let pin = (Some((2, 1)), None, None, None);
 			let clocks = (Some((5, 1)), None, None, None);
 
-			let (pio, (Some((_rx, mut tx)), _, _, _)) = pio.install_program_pio0(program, 1, pin, clocks).unwrap() else {
+			let (pio0, (Some((_rx, mut tx)), _, _, _)) = pio0.install_program(program, 1, pin, clocks).unwrap() else {
 				unreachable!();
 			};
 
-			let _pio = pio.start0().unwrap();
+			let _pio = pio0.start().unwrap();
 
-			tx.write(24 * 15);
+			tx.write(24 * 10);
 
             unsafe {
                 SINGLETON = Some(Hardware {
