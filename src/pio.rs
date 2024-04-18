@@ -1,12 +1,8 @@
-use pio::Program;
+use pio::{ArrayVec, Program};
 use rp2040_hal::pac::RESETS;
 use rp2040_hal::pio::{PIOExt, Rx, Tx, PIO, SM0, SM1, SM2, SM3};
 
 use crate::state_machine::{self, StateMachine};
-
-type ClockOption = Option<(u16, u8)>;
-type PinOption = Option<(u8, u8)>;
-type RxTx<PIO, SM> = (Rx<(PIO, SM)>, Tx<(PIO, SM)>);
 
 #[derive(Debug)]
 pub enum Error {
@@ -18,13 +14,20 @@ pub enum Error {
     BadStateMachineProgramming,
 }
 
+pub enum RxTx<P: PIOExt> {
+    SM0(Rx<(P, SM0)>, Tx<(P, SM0)>),
+    SM1(Rx<(P, SM1)>, Tx<(P, SM1)>),
+    SM2(Rx<(P, SM2)>, Tx<(P, SM2)>),
+    SM3(Rx<(P, SM3)>, Tx<(P, SM3)>),
+}
+
 pub struct Pio<P: PIOExt> {
     pio: PIO<P>,
     sm0: StateMachine<P, SM0>,
     sm1: StateMachine<P, SM1>,
     sm2: StateMachine<P, SM2>,
     sm3: StateMachine<P, SM3>,
-	in_use: bool,
+    in_use: bool,
 }
 
 impl<P: PIOExt> Pio<P> {
@@ -42,86 +45,70 @@ impl<P: PIOExt> Pio<P> {
     /// Installs a program
     ///
     /// Returns a tuple with the tx and rx for each state machine.
-    pub fn install_program(
+    pub fn install_program<const NUM: usize>(
         &mut self, program: Program<32>,
-        num_state_machines: usize,
-        state_machine_pins: (PinOption, PinOption, PinOption, PinOption),
-        state_machine_clock_divisors: (ClockOption, ClockOption, ClockOption, ClockOption)
-    ) -> Result<(Option<RxTx<P, SM0>>, Option<RxTx<P, SM1>>, Option<RxTx<P, SM2>>, Option<RxTx<P, SM3>>), Error> {
-        if num_state_machines > 4 {
+        pins: [(u8, u8); NUM],
+        clock_divisors: [(u16, u8); NUM],
+    ) -> Result<ArrayVec<RxTx<P>, NUM>, Error> {
+        if NUM > 4 {
             return Err(Error::TooManyStateMachinesRequested);
         }
 
         // Install the program to the PIO block
         let installed = self.pio.install(&program).unwrap();
 
-        let mut rxtx0 = None;
-        let mut rxtx1 = None;
-        let mut rxtx2 = None;
-        let mut rxtx3 = None;
+        let mut rxtxs: ArrayVec<_, NUM> = ArrayVec::new();
 
-        if num_state_machines >= 1 {
+        if NUM >= 1 {
             // Install to state machine 0
-            let (Some(pins), _, _, _) = state_machine_pins else {
-                return Err(Error::BadStateMachineProgramming);
-            };
-            let (Some(clock_divisor), _, _, _) = state_machine_clock_divisors else {
-                return Err(Error::BadStateMachineProgramming);
-            };
-            let Ok(rxtx) = self.sm0.program(&installed, pins, clock_divisor) else {
+            let pins = pins[0];
+            let clock_divisor = clock_divisors[0];
+
+            let Ok((rx, tx)) = self.sm0.program(&installed, pins, clock_divisor) else {
                 return Err(Error::BadStateMachineProgramming);
             };
 
-            rxtx0 = Some(rxtx);
+            rxtxs.push(RxTx::SM0(rx, tx));
         }
 
-        if num_state_machines >= 2 {
+        if NUM >= 2 {
             // Install to state machine 1
-            let (_, Some(pins), _, _) = state_machine_pins else {
-                return Err(Error::BadStateMachineProgramming);
-            };
-            let (_, Some(clock_divisor), _, _) = state_machine_clock_divisors else {
-                return Err(Error::BadStateMachineProgramming);
-            };
-            let Ok(rxtx) = self.sm1.program(&installed, pins, clock_divisor) else {
+            let pins = pins[1];
+            let clock_divisor = clock_divisors[1];
+
+            let Ok((rx, tx)) = self.sm1.program(&installed, pins, clock_divisor) else {
                 return Err(Error::BadStateMachineProgramming);
             };
 
-            rxtx1 = Some(rxtx);
+            rxtxs.push(RxTx::SM1(rx, tx));
         }
 
-        if num_state_machines >= 3 {
+        if NUM >= 3 {
             // Install to state machine 2
-            let (_, _, Some(pins), _) = state_machine_pins else {
-                return Err(Error::BadStateMachineProgramming);
-            };
-            let (_, _, Some(clock_divisor), _) = state_machine_clock_divisors else {
-                return Err(Error::BadStateMachineProgramming);
-            };
-            let Ok(rxtx) = self.sm2.program(&installed, pins, clock_divisor) else {
+            let pins = pins[2];
+            let clock_divisor = clock_divisors[2];
+
+            let Ok((rx, tx)) = self.sm2.program(&installed, pins, clock_divisor) else {
                 return Err(Error::BadStateMachineProgramming);
             };
 
-            rxtx2 = Some(rxtx);
+            rxtxs.push(RxTx::SM2(rx, tx));
         }
 
-        if num_state_machines >= 4 {
+        if NUM >= 4 {
             // Install to state machine 3
-            let (_, _, _, Some(pins)) = state_machine_pins else {
-                return Err(Error::BadStateMachineProgramming);
-            };
-            let (_, _, _, Some(clock_divisor)) = state_machine_clock_divisors else {
-                return Err(Error::BadStateMachineProgramming);
-            };
-            let Ok(rxtx) = self.sm3.program(&installed, pins, clock_divisor) else {
+            let pins = pins[3];
+            let clock_divisor = clock_divisors[3];
+
+            let Ok((rx, tx)) = self.sm3.program(&installed, pins, clock_divisor) else {
                 return Err(Error::BadStateMachineProgramming);
             };
 
-            rxtx3 = Some(rxtx);
+            rxtxs.push(RxTx::SM3(rx, tx));
         }
 
-		self.in_use = true;
-        return Ok((rxtx0, rxtx1, rxtx2, rxtx3));
+        self.in_use = true;
+        return Ok(rxtxs);
     }
 
     /// Uninstalls a program
@@ -129,25 +116,21 @@ impl<P: PIOExt> Pio<P> {
     /// * `rxtx` - The same rx and tx channels returned by install_program
     ///
     /// Returns a tuple with the tx and rx for each state machine.
-    pub fn unininstall_program(
+    pub fn unininstall_program<const NUM: usize>(
         &mut self,
-        rxtx: (Option<RxTx<P, SM0>>, Option<RxTx<P, SM1>>, Option<RxTx<P, SM2>>, Option<RxTx<P, SM3>>)
+        rxtxs: ArrayVec<RxTx<P>, NUM>
     ) -> Result<(), state_machine::Error> {
-		if let (Some((rx, tx)), _, _, _) = rxtx {
-			self.sm0.uninstall(rx, tx)?;
-		}
-		if let (_, Some((rx, tx)), _, _) = rxtx {
-			self.sm1.uninstall(rx, tx)?;
-		}
-		if let (_, _, Some((rx, tx)), _) = rxtx {
-			self.sm2.uninstall(rx, tx)?;
-		}
-		if let (_, _, _, Some((rx, tx))) = rxtx {
-			self.sm3.uninstall(rx, tx)?;
-		}
+        for rxtx in rxtxs {
+            match rxtx {
+                RxTx::SM0(rx, tx) => self.sm0.uninstall(rx, tx)?,
+                RxTx::SM1(rx, tx) => self.sm1.uninstall(rx, tx)?,
+                RxTx::SM2(rx, tx) => self.sm2.uninstall(rx, tx)?,
+                RxTx::SM3(rx, tx) => self.sm3.uninstall(rx, tx)?,
+            }
+        }
 
-		self.in_use = false;
-		return Ok(());
+        self.in_use = false;
+        return Ok(());
     }
 
     /// Returns whether or not this pio is in use

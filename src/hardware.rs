@@ -4,7 +4,7 @@ use cortex_m::delay::Delay;
 use rp2040_hal::{clocks::init_clocks_and_plls, gpio::{FunctionPio0, Pin}, pac, usb::UsbBus, Clock, Sio, Watchdog};
 use usb_device::class_prelude::UsbBusAllocator;
 
-use crate::{pio::Pio, usb_manager::UsbManager};
+use crate::{pio::{Pio, RxTx}, usb_manager::UsbManager};
 
 static mut SINGLETON: Option<Hardware> = None;
 
@@ -63,51 +63,52 @@ impl Hardware {
             );
 
 
-			let mut pio0 = Pio::new(pac.PIO0, &mut pac.RESETS);
-			let _pio1 = Pio::new(pac.PIO1, &mut pac.RESETS);
+            let mut pio0 = Pio::new(pac.PIO0, &mut pac.RESETS);
+            let _pio1 = Pio::new(pac.PIO1, &mut pac.RESETS);
 
-			let program = pio_proc::pio_asm!(
-				"set pindirs, 1
+            let program = pio_proc::pio_asm!(
+                "set pindirs, 1
 
-				pull
-				mov y osr
+                pull
+                mov y osr
 
-				.wrap_target
+                .wrap_target
 
-				mov x y
+                mov x y
 
-				color:
-				send_1:
-					set pins, 1 [19]
-					set pins, 0 [9]
+                color:
+                send_1:
+                    set pins, 1 [19]
+                    set pins, 0 [9]
 
-				// send_0:
-				// 	set pins, 1 [9]
-				// 	set pins, 0 [19]
+                // send_0:
+                // 	set pins, 1 [9]
+                // 	set pins, 0 [19]
 
-				jmp x-- color
-				mov x y
+                jmp x-- color
+                mov x y
 
-				reset:
-					set pins, 0 [31]
-					set pins, 0 [31]
-					jmp x-- reset
+                reset:
+                    set pins, 0 [31]
+                    set pins, 0 [31]
+                    jmp x-- reset
 
-				.wrap"
-			).program;
+                .wrap"
+            ).program;
 
-			let _: Pin<_, FunctionPio0, _> = pins.gpio2.into_function();
+            let _: Pin<_, FunctionPio0, _> = pins.gpio2.into_function();
 
-			let pin = (Some((2, 1)), None, None, None);
-			let clocks = (Some((5, 1)), None, None, None);
+            let pin = [(2, 1)];
+            let clocks = [(5, 1)];
 
-			let (Some((_rx, mut tx)), _, _, _) = pio0.install_program(program, 1, pin, clocks).unwrap() else {
-				unreachable!();
-			};
+            let mut rxtxs = pio0.install_program(program, pin, clocks).unwrap();
+            let RxTx::SM0(_rx, mut tx) = rxtxs.pop().unwrap() else {
+                unreachable!();
+            };
 
-			let _pio = pio0.start().unwrap();
+            let _pio = pio0.start().unwrap();
 
-			tx.write(24 * 10);
+            tx.write(24 * 10);
 
             unsafe {
                 SINGLETON = Some(Hardware {
