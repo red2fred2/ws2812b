@@ -10,6 +10,8 @@ extern crate cortex_m_rt;
 
 pub mod hardware;
 pub mod pio;
+pub mod tx;
+pub mod rx;
 pub mod serial_logger;
 pub mod state_machine;
 pub mod usb_manager;
