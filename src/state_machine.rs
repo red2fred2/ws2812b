@@ -1,6 +1,9 @@
 use core::cell::Cell;
 
-use rp2040_hal::pio::{self, InstalledProgram, PIOBuilder, PIOExt, Running, Rx, StateMachineIndex, Stopped, Tx, UninitStateMachine};
+use rp2040_hal::pio::{self, InstalledProgram, PIOBuilder, PIOExt, Running, StateMachineIndex, Stopped, UninitStateMachine};
+
+use crate::rx::Rx;
+use crate::tx::Tx;
 
 #[derive(Debug)]
 pub enum Error {
@@ -8,8 +11,9 @@ pub enum Error {
     FailedToStart,
     FailedToStop,
 	NoProgramToUninstall,
+    WrongRxInUninstall,
+    WrongTxInUninstall
 }
-
 
 enum StateMachineKind<PIO: PIOExt, SM: StateMachineIndex> {
     Running(pio::StateMachine<(PIO, SM), Running>),
@@ -24,7 +28,7 @@ pub struct StateMachine<PIO: PIOExt, SM: StateMachineIndex> {
 	running: bool,
 }
 
-impl<PIO: PIOExt, SM: StateMachineIndex> StateMachine<PIO, SM> {
+impl<PIO: PIOExt + 'static, SM: StateMachineIndex + 'static> StateMachine<PIO, SM> {
     /// Create a new state machine from a pio state machine
     pub fn new(state_machine: UninitStateMachine<(PIO, SM)>) -> StateMachine<PIO, SM> {
 		let sm = StateMachineKind::Uninitialized(state_machine);
@@ -47,7 +51,7 @@ impl<PIO: PIOExt, SM: StateMachineIndex> StateMachine<PIO, SM> {
         installed: &InstalledProgram<PIO>,
         pins: (u8, u8),
         clock_divisor: (u16, u8)
-    ) -> Result<(Rx<(PIO, SM)>, Tx<(PIO, SM)>), Error> {
+    ) -> Result<(Rx, Tx), Error> {
         critical_section::with(|_| {
 			// Make sure the machine is uninitialized before trying to program it
 			let sm = self.sm.replace(StateMachineKind::BeingSwapped);
@@ -72,11 +76,15 @@ impl<PIO: PIOExt, SM: StateMachineIndex> StateMachine<PIO, SM> {
 			// Change values
 			self.sm = Cell::new(StateMachineKind::Stopped(sm));
 			self.initialized = true;
-			Ok((rx, tx))
+
+            let rx = Rx::from(rx);
+            let tx = Tx::from(tx);
+
+            Ok((rx, tx))
 		})
     }
 
-	pub fn uninstall(&mut self, rx: Rx<(PIO, SM)>, tx: Tx<(PIO, SM)>) -> Result<(), Error> {
+	pub fn uninstall(&mut self, rx: Rx, tx: Tx) -> Result<(), Error> {
 		critical_section::with(|_| {
 			let sm = self.sm.replace(StateMachineKind::BeingSwapped);
 			// Stop the machine if it's still running
@@ -87,6 +95,14 @@ impl<PIO: PIOExt, SM: StateMachineIndex> StateMachine<PIO, SM> {
 			let StateMachineKind::Stopped(sm) = sm else {
 				return Err(Error::NoProgramToUninstall)
 			};
+
+            let Ok(rx) = rx.try_into() else {
+                return Err(Error::WrongRxInUninstall)
+            };
+
+            let Ok(tx) = tx.try_into() else {
+                return Err(Error::WrongRxInUninstall)
+            };
 
 			let (sm, _) = sm.uninit(rx, tx);
 
