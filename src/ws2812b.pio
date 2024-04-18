@@ -13,9 +13,9 @@ send_1:
 	set pins, 1 [19]
 	set pins, 0 [9]
 
-// send_0:
-// 	set pins, 1 [9]
-// 	set pins, 0 [19]
+; send_0:
+; 	set pins, 1 [9]
+; 	set pins, 0 [19]
 
 jmp x-- color
 mov x y
