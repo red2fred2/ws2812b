@@ -3,7 +3,7 @@ use rp2040_hal as hal;
 use rp2040_hal::pac::interrupt;
 use usb_device::{
     bus::UsbBusAllocator,
-    device::{UsbDevice, UsbDeviceBuilder, UsbVidPid},
+    device::{UsbDevice, UsbDeviceBuilder, UsbVidPid}
 };
 use usbd_serial::SerialPort;
 
@@ -29,8 +29,9 @@ impl UsbManager {
 
     /// Handles USB reads
     ///
-    /// All this does is dump the data in a buffer and walk away. Once the buffer
-    /// fills, it'll just miss anything new.
+    /// # Safety
+	/// All this does is dump the data in a buffer and walk away. Once the buffer
+	/// fills, it'll just miss anything new.
     pub unsafe fn interrupt(&mut self) {
         if self.device.poll(&mut [&mut self.serial]) {
             let mut data: [u8; 256] = [0x00; 256];
@@ -42,16 +43,13 @@ impl UsbManager {
 
 // Fmt implementation for USB writes
 impl core::fmt::Write for UsbManager {
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+    fn write_str(&mut self, s: &str) -> Result<(), core::fmt::Error> {
         let result = self.serial.write(s.as_bytes());
 
-        // Ignore the result, because if it's handled, it'll just create more
-        // data recursively and blow up.
-        match result {
-            _ => (),
-        }
-
-        Ok(())
+		match result {
+			Ok(_) => Ok(()),
+			Err(_) => Err(core::fmt::Error)
+		}
     }
 }
 
@@ -61,7 +59,7 @@ unsafe fn USBCTRL_IRQ() {
     // If usb isn't enabled by the time an interrupt is attempted, just ignore
     // it and hope nothing bad happens.
     let Some(hardware) = Hardware::get() else {
-        return;
+        return
     };
 
     hardware.get_usb().interrupt()

@@ -49,7 +49,7 @@ impl SerialLogger {
     fn write_affix() {
         // Skip this if hardware isn't set up yet
         let Some(hardware) = Hardware::get() else {
-            return;
+            return
         };
         let usb = hardware.get_usb();
 
@@ -64,7 +64,7 @@ impl SerialLogger {
     fn write_coloring(level: &Level) {
         // Skip this if hardware isn't set up yet
         let Some(hardware) = Hardware::get() else {
-            return;
+            return
         };
         let usb = hardware.get_usb();
 
@@ -87,7 +87,7 @@ impl SerialLogger {
     fn write_message(message: &Arguments) {
         // Skip this if hardware isn't set up yet
         let Some(hardware) = Hardware::get() else {
-            return;
+            return
         };
         let usb = hardware.get_usb();
         let result = usb.write_fmt(*message);
