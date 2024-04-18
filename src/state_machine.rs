@@ -1,93 +1,119 @@
+use core::cell::Cell;
+
 use rp2040_hal::pio::{self, InstalledProgram, PIOBuilder, PIOExt, Running, Rx, StateMachineIndex, Stopped, Tx, UninitStateMachine};
 
 enum StateMachineKind<PIO: PIOExt, SM: StateMachineIndex> {
     Running(pio::StateMachine<(PIO, SM), Running>),
     Stopped(pio::StateMachine<(PIO, SM), Stopped>),
     Uninitialized(UninitStateMachine<(PIO, SM)>),
+	BeingSwapped,
 }
 
 pub struct StateMachine<PIO: PIOExt, SM: StateMachineIndex> {
-    sm: StateMachineKind<PIO, SM>
+    sm: Cell<StateMachineKind<PIO, SM>>,
+	initialized: bool,
+	running: bool,
 }
 
 impl<PIO: PIOExt, SM: StateMachineIndex> StateMachine<PIO, SM> {
     /// Create a new state machine from a pio state machine
     pub fn new(state_machine: UninitStateMachine<(PIO, SM)>) -> StateMachine<PIO, SM> {
-        let sm = StateMachineKind::Uninitialized(state_machine);
+		let sm = StateMachineKind::Uninitialized(state_machine);
+        let sm = Cell::new(sm);
 
-        StateMachine {sm}
+		StateMachine {sm, initialized: false, running: false}
     }
 
     pub fn is_initialized(&self) -> bool {
-        match self.sm {
-            StateMachineKind::Uninitialized(_) => false,
-            _ => true
-        }
+		self.initialized
+    }
+
+	pub fn is_running(&self) -> bool {
+		self.running
     }
 
     /// Program this state machine
     pub fn program(
-        mut self,
+        &mut self,
         installed: &InstalledProgram<PIO>,
         pins: (u8, u8),
         clock_divisor: (u16, u8)
-    ) -> Result<(Self, (Rx<(PIO, SM)>, Tx<(PIO, SM)>)), Error> {
-        // Make sure the machine is uninitialized before trying to program it
-        let StateMachineKind::Uninitialized(sm) = self.sm  else {
-            return Err(Error::ProgrammingFailed)
-        };
+    ) -> Result<(Rx<(PIO, SM)>, Tx<(PIO, SM)>), Error> {
+        critical_section::with(|_| {
+			// Make sure the machine is uninitialized before trying to program it
+			let sm = self.sm.replace(StateMachineKind::BeingSwapped);
+			let StateMachineKind::Uninitialized(sm) = sm else {
+				return Err(Error::ProgrammingFailed)
+			};
 
-        let (base, count) = pins;
-        let (int, frac) = clock_divisor;
+			// Get values in order
+			let (base, count) = pins;
+			let (int, frac) = clock_divisor;
 
-        let program;
-        unsafe {program = installed.share();}
+			let program;
+			unsafe {program = installed.share();}
 
-        let (sm, rx, tx) = PIOBuilder
-            ::from_installed_program(program)
-            .set_pins(base, count)
-            .clock_divisor_fixed_point(int, frac)
-            .build(sm);
+			// Program it
+			let (sm, rx, tx) = PIOBuilder
+				::from_installed_program(program)
+				.set_pins(base, count)
+				.clock_divisor_fixed_point(int, frac)
+				.build(sm);
 
-        self.sm = StateMachineKind::Stopped(sm);
-
-        return Ok((self, (rx, tx)))
+			// Change values
+			self.sm = Cell::new(StateMachineKind::Stopped(sm));
+			self.initialized = true;
+			return Ok((rx, tx));
+		})
     }
 
-	pub fn uninstall(mut self, rx: Rx<(PIO, SM)>, tx: Tx<(PIO, SM)>) -> Result<Self, Error> {
-		// Stop the machine if it's still running
-		if let StateMachineKind::Running(_) = &self.sm {
-			self = self.stop()?;
-		}
+	pub fn uninstall(&mut self, rx: Rx<(PIO, SM)>, tx: Tx<(PIO, SM)>) -> Result<(), Error> {
+		critical_section::with(|_| {
+			let sm = self.sm.replace(StateMachineKind::BeingSwapped);
+			// Stop the machine if it's still running
+			if let StateMachineKind::Running(_) = &sm {
+				self.stop()?;
+			}
 
-		let StateMachineKind::Stopped(sm) = self.sm else {
-			return Err(Error::NoProgramToUninstall)
-		};
+			let StateMachineKind::Stopped(sm) = sm else {
+				return Err(Error::NoProgramToUninstall)
+			};
 
-		let (sm, _) = sm.uninit(rx, tx);
+			let (sm, _) = sm.uninit(rx, tx);
 
-		self.sm = StateMachineKind::Uninitialized(sm);
-		return Ok(self);
+			// Change values
+			self.sm = Cell::new(StateMachineKind::Uninitialized(sm));
+			self.initialized = false;
+			return Ok(());
+		})
 	}
 
-    pub fn start(mut self) -> Result<Self, Error> {
-        let StateMachineKind::Stopped(sm) = self.sm else {
-            return Err(Error::FailedToStart);
-        };
+    pub fn start(&mut self) -> Result<(), Error> {
+		critical_section::with(|_| {
+			let sm = self.sm.replace(StateMachineKind::BeingSwapped);
+			let StateMachineKind::Stopped(sm) = sm else {
+				return Err(Error::FailedToStart);
+			};
 
-        let sm = sm.start();
-        self.sm = StateMachineKind::Running(sm);
-        return Ok(self);
+			let sm = sm.start();
+			self.sm = Cell::new(StateMachineKind::Running(sm));
+			self.running = true;
+			return Ok(());
+		})
     }
 
-    pub fn stop(mut self) -> Result<Self, Error> {
-        let StateMachineKind::Running(sm) = self.sm else {
-            return Err(Error::FailedToStop);
-        };
+    pub fn stop(&mut self) -> Result<(), Error> {
+		critical_section::with(|_| {
+			let sm = self.sm.replace(StateMachineKind::BeingSwapped);
+			let StateMachineKind::Running(sm) = sm else {
+				return Err(Error::FailedToStop);
+			};
 
-        let sm = sm.stop();
-        self.sm = StateMachineKind::Stopped(sm);
-        return Ok(self);
+			let sm = sm.stop();
+			self.sm = Cell::new(StateMachineKind::Stopped(sm));
+			self.running = false;
+			return Ok(());
+		})
     }
 }
 

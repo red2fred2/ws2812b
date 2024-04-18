@@ -63,7 +63,7 @@ impl Hardware {
             );
 
 
-			let pio0 = Pio::new(pac.PIO0, &mut pac.RESETS);
+			let mut pio0 = Pio::new(pac.PIO0, &mut pac.RESETS);
 			let _pio1 = Pio::new(pac.PIO1, &mut pac.RESETS);
 
 			let program = pio_proc::pio_asm!(
@@ -101,7 +101,7 @@ impl Hardware {
 			let pin = (Some((2, 1)), None, None, None);
 			let clocks = (Some((5, 1)), None, None, None);
 
-			let (pio0, (Some((_rx, mut tx)), _, _, _)) = pio0.install_program(program, 1, pin, clocks).unwrap() else {
+			let (Some((_rx, mut tx)), _, _, _) = pio0.install_program(program, 1, pin, clocks).unwrap() else {
 				unreachable!();
 			};
 

@@ -41,21 +41,13 @@ impl<P: PIOExt> Pio<P> {
 
     /// Installs a program
     ///
-    /// * `program` - The program to be loaded
-    /// * `num_state_machines` - The number of state machines to load to
-    /// * `state_machine_pins` - A tuple containing the pins to be controlled by
-    /// each state machine. It is laid out as [(SM0 base pin, SM0 range), (SM1 base pin, SM1 range), None, None]
-    /// * `state_machine_clock_divisors` - A tuple containing the clock divisors
-    /// for each state machine. It is laid out the same as state_machine_pins, but
-    /// with (clock int, clock frac)
-    ///
-    /// Returns a slice with the tx and rx for each state machine.
+    /// Returns a tuple with the tx and rx for each state machine.
     pub fn install_program(
-        mut self, program: Program<32>,
+        &mut self, program: Program<32>,
         num_state_machines: usize,
         state_machine_pins: (PinOption, PinOption, PinOption, PinOption),
         state_machine_clock_divisors: (ClockOption, ClockOption, ClockOption, ClockOption)
-    ) -> Result<(Self, (Option<RxTx<P, SM0>>, Option<RxTx<P, SM1>>, Option<RxTx<P, SM2>>, Option<RxTx<P, SM3>>)), Error> {
+    ) -> Result<(Option<RxTx<P, SM0>>, Option<RxTx<P, SM1>>, Option<RxTx<P, SM2>>, Option<RxTx<P, SM3>>), Error> {
         if num_state_machines > 4 {
             return Err(Error::TooManyStateMachinesRequested);
         }
@@ -76,10 +68,9 @@ impl<P: PIOExt> Pio<P> {
             let (Some(clock_divisor), _, _, _) = state_machine_clock_divisors else {
                 return Err(Error::BadStateMachineProgramming);
             };
-            let Ok((sm, rxtx)) = self.sm0.program(&installed, pins, clock_divisor) else {
+            let Ok(rxtx) = self.sm0.program(&installed, pins, clock_divisor) else {
                 return Err(Error::BadStateMachineProgramming);
             };
-            self.sm0 = sm;
 
             rxtx0 = Some(rxtx);
         }
@@ -92,10 +83,9 @@ impl<P: PIOExt> Pio<P> {
             let (_, Some(clock_divisor), _, _) = state_machine_clock_divisors else {
                 return Err(Error::BadStateMachineProgramming);
             };
-            let Ok((sm, rxtx)) = self.sm1.program(&installed, pins, clock_divisor) else {
+            let Ok(rxtx) = self.sm1.program(&installed, pins, clock_divisor) else {
                 return Err(Error::BadStateMachineProgramming);
             };
-            self.sm1 = sm;
 
             rxtx1 = Some(rxtx);
         }
@@ -108,10 +98,9 @@ impl<P: PIOExt> Pio<P> {
             let (_, _, Some(clock_divisor), _) = state_machine_clock_divisors else {
                 return Err(Error::BadStateMachineProgramming);
             };
-            let Ok((sm, rxtx)) = self.sm2.program(&installed, pins, clock_divisor) else {
+            let Ok(rxtx) = self.sm2.program(&installed, pins, clock_divisor) else {
                 return Err(Error::BadStateMachineProgramming);
             };
-            self.sm2 = sm;
 
             rxtx2 = Some(rxtx);
         }
@@ -124,42 +113,41 @@ impl<P: PIOExt> Pio<P> {
             let (_, _, _, Some(clock_divisor)) = state_machine_clock_divisors else {
                 return Err(Error::BadStateMachineProgramming);
             };
-            let Ok((sm, rxtx)) = self.sm3.program(&installed, pins, clock_divisor) else {
+            let Ok(rxtx) = self.sm3.program(&installed, pins, clock_divisor) else {
                 return Err(Error::BadStateMachineProgramming);
             };
-            self.sm3 = sm;
 
             rxtx3 = Some(rxtx);
         }
 
 		self.in_use = true;
-        return Ok((self, (rxtx0, rxtx1, rxtx2, rxtx3)));
+        return Ok((rxtx0, rxtx1, rxtx2, rxtx3));
     }
 
     /// Uninstalls a program
     ///
     /// * `rxtx` - The same rx and tx channels returned by install_program
     ///
-    /// Returns a slice with the tx and rx for each state machine.
+    /// Returns a tuple with the tx and rx for each state machine.
     pub fn unininstall_program(
-        mut self,
+        &mut self,
         rxtx: (Option<RxTx<P, SM0>>, Option<RxTx<P, SM1>>, Option<RxTx<P, SM2>>, Option<RxTx<P, SM3>>)
-    ) -> Result<Self, state_machine::Error> {
+    ) -> Result<(), state_machine::Error> {
 		if let (Some((rx, tx)), _, _, _) = rxtx {
-			self.sm0 = self.sm0.uninstall(rx, tx)?;
+			self.sm0.uninstall(rx, tx)?;
 		}
 		if let (_, Some((rx, tx)), _, _) = rxtx {
-			self.sm1 = self.sm1.uninstall(rx, tx)?;
+			self.sm1.uninstall(rx, tx)?;
 		}
 		if let (_, _, Some((rx, tx)), _) = rxtx {
-			self.sm2 = self.sm2.uninstall(rx, tx)?;
+			self.sm2.uninstall(rx, tx)?;
 		}
 		if let (_, _, _, Some((rx, tx))) = rxtx {
-			self.sm3 = self.sm3.uninstall(rx, tx)?;
+			self.sm3.uninstall(rx, tx)?;
 		}
 
 		self.in_use = false;
-		return Ok(self);
+		return Ok(());
     }
 
     /// Returns whether or not this pio is in use
@@ -168,46 +156,38 @@ impl<P: PIOExt> Pio<P> {
     }
 
     /// Starts the state machines
-    pub fn start(mut self) -> Result<Self, state_machine::Error> {
+    pub fn start(&mut self) -> Result<(), state_machine::Error> {
         if self.sm0.is_initialized() {
-            let sm = self.sm0.start()?;
-            self.sm0 = sm;
+            self.sm0.start()?;
         }
         if self.sm1.is_initialized() {
-            let sm = self.sm1.start()?;
-            self.sm1 = sm;
+            self.sm1.start()?;
         }
         if self.sm2.is_initialized() {
-            let sm = self.sm2.start()?;
-            self.sm2 = sm;
+            self.sm2.start()?;
         }
         if self.sm3.is_initialized() {
-            let sm = self.sm3.start()?;
-            self.sm3 = sm;
+            self.sm3.start()?;
         }
 
-        Ok(self)
+        Ok(())
     }
 
     /// Stops the state machines
-    pub fn stop(mut self) -> Result<Self, state_machine::Error> {
+    pub fn stop(&mut self) -> Result<(), state_machine::Error> {
         if self.sm0.is_initialized() {
-            let sm = self.sm0.stop()?;
-            self.sm0 = sm;
+            self.sm0.stop()?;
         }
         if self.sm1.is_initialized() {
-            let sm = self.sm1.stop()?;
-            self.sm1 = sm;
+            self.sm1.stop()?;
         }
         if self.sm2.is_initialized() {
-            let sm = self.sm2.stop()?;
-            self.sm2 = sm;
+            self.sm2.stop()?;
         }
         if self.sm3.is_initialized() {
-            let sm = self.sm3.stop()?;
-            self.sm3 = sm;
+            self.sm3.stop()?;
         }
 
-        Ok(self)
+        Ok(())
     }
 }
