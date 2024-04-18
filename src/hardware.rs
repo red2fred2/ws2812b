@@ -66,35 +66,7 @@ impl Hardware {
             let mut pio0 = Pio::new(pac.PIO0, &mut pac.RESETS);
             let _pio1 = Pio::new(pac.PIO1, &mut pac.RESETS);
 
-            let program = pio_proc::pio_asm!(
-                "set pindirs, 1
-
-                pull
-                mov y osr
-
-                .wrap_target
-
-                mov x y
-
-                color:
-                send_1:
-                    set pins, 1 [19]
-                    set pins, 0 [9]
-
-                // send_0:
-                // 	set pins, 1 [9]
-                // 	set pins, 0 [19]
-
-                jmp x-- color
-                mov x y
-
-                reset:
-                    set pins, 0 [31]
-                    set pins, 0 [31]
-                    jmp x-- reset
-
-                .wrap"
-            ).program;
+            let program = pio_proc::pio_file!("src/ws2812b.pio").program;
 
             let _: Pin<_, FunctionPio0, _> = pins.gpio2.into_function();
 
