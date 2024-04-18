@@ -61,7 +61,7 @@ impl SerialLogger {
     }
 
     /// Writes the color escape code for this log level
-    fn write_coloring(level: &Level) -> () {
+    fn write_coloring(level: &Level) {
         // Skip this if hardware isn't set up yet
         let Some(hardware) = Hardware::get() else {
             return;
@@ -90,14 +90,18 @@ impl SerialLogger {
             return;
         };
         let usb = hardware.get_usb();
-
-        let args = message.clone();
-        let result = usb.write_fmt(args);
+        let result = usb.write_fmt(*message);
 
         if result.is_err() {
             warn!("Failed to write log message");
         }
     }
+}
+
+impl Default for SerialLogger {
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
 impl Log for SerialLogger {
