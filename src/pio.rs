@@ -51,7 +51,7 @@ impl<P: PIOExt> Pio<P> {
         clock_divisors: [(u16, u8); NUM],
     ) -> Result<ArrayVec<RxTx<P>, NUM>, Error> {
         if NUM > 4 {
-            return Err(Error::TooManyStateMachinesRequested);
+            return Err(Error::TooManyStateMachinesRequested)
         }
 
         // Install the program to the PIO block
@@ -65,7 +65,7 @@ impl<P: PIOExt> Pio<P> {
             let clock_divisor = clock_divisors[0];
 
             let Ok((rx, tx)) = self.sm0.program(&installed, pins, clock_divisor) else {
-                return Err(Error::BadStateMachineProgramming);
+                return Err(Error::BadStateMachineProgramming)
             };
 
             rxtxs.push(RxTx::SM0(rx, tx));
@@ -77,7 +77,7 @@ impl<P: PIOExt> Pio<P> {
             let clock_divisor = clock_divisors[1];
 
             let Ok((rx, tx)) = self.sm1.program(&installed, pins, clock_divisor) else {
-                return Err(Error::BadStateMachineProgramming);
+                return Err(Error::BadStateMachineProgramming)
             };
 
             rxtxs.push(RxTx::SM1(rx, tx));
@@ -89,7 +89,7 @@ impl<P: PIOExt> Pio<P> {
             let clock_divisor = clock_divisors[2];
 
             let Ok((rx, tx)) = self.sm2.program(&installed, pins, clock_divisor) else {
-                return Err(Error::BadStateMachineProgramming);
+                return Err(Error::BadStateMachineProgramming)
             };
 
             rxtxs.push(RxTx::SM2(rx, tx));
@@ -101,14 +101,14 @@ impl<P: PIOExt> Pio<P> {
             let clock_divisor = clock_divisors[3];
 
             let Ok((rx, tx)) = self.sm3.program(&installed, pins, clock_divisor) else {
-                return Err(Error::BadStateMachineProgramming);
+                return Err(Error::BadStateMachineProgramming)
             };
 
             rxtxs.push(RxTx::SM3(rx, tx));
         }
 
         self.in_use = true;
-        return Ok(rxtxs);
+        Ok(rxtxs)
     }
 
     /// Uninstalls a program
@@ -130,7 +130,7 @@ impl<P: PIOExt> Pio<P> {
         }
 
         self.in_use = false;
-        return Ok(());
+        Ok(())
     }
 
     /// Returns whether or not this pio is in use

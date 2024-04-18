@@ -78,7 +78,7 @@ impl Hardware {
                 unreachable!();
             };
 
-            let _pio = pio0.start().unwrap();
+            let _ = pio0.start();
 
             tx.write(24 * 10);
 
