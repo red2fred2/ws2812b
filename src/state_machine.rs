@@ -2,6 +2,15 @@ use core::cell::Cell;
 
 use rp2040_hal::pio::{self, InstalledProgram, PIOBuilder, PIOExt, Running, Rx, StateMachineIndex, Stopped, Tx, UninitStateMachine};
 
+#[derive(Debug)]
+pub enum Error {
+    ProgrammingFailed,
+    FailedToStart,
+    FailedToStop,
+	NoProgramToUninstall,
+}
+
+
 enum StateMachineKind<PIO: PIOExt, SM: StateMachineIndex> {
     Running(pio::StateMachine<(PIO, SM), Running>),
     Stopped(pio::StateMachine<(PIO, SM), Stopped>),
@@ -63,7 +72,7 @@ impl<PIO: PIOExt, SM: StateMachineIndex> StateMachine<PIO, SM> {
 			// Change values
 			self.sm = Cell::new(StateMachineKind::Stopped(sm));
 			self.initialized = true;
-			return Ok((rx, tx));
+			Ok((rx, tx))
 		})
     }
 
@@ -84,7 +93,7 @@ impl<PIO: PIOExt, SM: StateMachineIndex> StateMachine<PIO, SM> {
 			// Change values
 			self.sm = Cell::new(StateMachineKind::Uninitialized(sm));
 			self.initialized = false;
-			return Ok(());
+			Ok(())
 		})
 	}
 
@@ -98,7 +107,7 @@ impl<PIO: PIOExt, SM: StateMachineIndex> StateMachine<PIO, SM> {
 			let sm = sm.start();
 			self.sm = Cell::new(StateMachineKind::Running(sm));
 			self.running = true;
-			return Ok(());
+			Ok(())
 		})
     }
 
@@ -106,21 +115,13 @@ impl<PIO: PIOExt, SM: StateMachineIndex> StateMachine<PIO, SM> {
 		critical_section::with(|_| {
 			let sm = self.sm.replace(StateMachineKind::BeingSwapped);
 			let StateMachineKind::Running(sm) = sm else {
-				return Err(Error::FailedToStop);
+				return Err(Error::FailedToStop)
 			};
 
 			let sm = sm.stop();
 			self.sm = Cell::new(StateMachineKind::Stopped(sm));
 			self.running = false;
-			return Ok(());
+			Ok(())
 		})
     }
-}
-
-#[derive(Debug)]
-pub enum Error {
-    ProgrammingFailed,
-    FailedToStart,
-    FailedToStop,
-	NoProgramToUninstall,
 }
