@@ -44,12 +44,8 @@ impl UsbManager {
 // Fmt implementation for USB writes
 impl core::fmt::Write for UsbManager {
     fn write_str(&mut self, s: &str) -> Result<(), core::fmt::Error> {
-        let result = self.serial.write(s.as_bytes());
-
-		match result {
-			Ok(_) => Ok(()),
-			Err(_) => Err(core::fmt::Error)
-		}
+        let _ = self.serial.write(s.as_bytes());
+		Ok(())
     }
 }
 
