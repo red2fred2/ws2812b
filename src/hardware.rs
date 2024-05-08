@@ -97,11 +97,11 @@ impl Hardware {
         &mut self.pins
     }
 
-	pub fn get_pio0(&mut self) -> &mut Pio<PIO0> {
+    pub fn get_pio0(&mut self) -> &mut Pio<PIO0> {
         &mut self.pio0
     }
 
-	pub fn get_pio1(&mut self) -> &mut Pio<PIO1> {
+    pub fn get_pio1(&mut self) -> &mut Pio<PIO1> {
         &mut self.pio1
     }
 

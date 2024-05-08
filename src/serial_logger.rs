@@ -99,9 +99,9 @@ impl SerialLogger {
 }
 
 impl Default for SerialLogger {
-	fn default() -> Self {
-		Self::new()
-	}
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Log for SerialLogger {
