@@ -174,5 +174,6 @@ impl Hardware {
 }
 
 fn already_owned<T>(data: &RefCell<Option<T>>) -> bool {
-    data.borrow().as_ref().is_some()
+    let result = data.try_borrow();
+    !matches!(result, Ok(v) if v.as_ref().is_none())
 }
