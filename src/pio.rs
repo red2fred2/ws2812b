@@ -1,10 +1,8 @@
 use pio::{ArrayVec, Program};
 use rp2040_hal::pac::RESETS;
-use rp2040_hal::pio::{PIOExt, PIO, SM0, SM1, SM2, SM3};
+use rp2040_hal::pio::{PIOExt, Rx, Tx, PIO, SM0, SM1, SM2, SM3};
 
-use crate::rx::Rx;
 use crate::state_machine::{self, StateMachine};
-use crate::tx::Tx;
 
 #[derive(Debug)]
 pub enum Error {
@@ -16,6 +14,13 @@ pub enum Error {
     BadStateMachineProgramming,
 }
 
+pub enum RxTx<P: PIOExt> {
+    SM0(Rx<(P, SM0)>, Tx<(P, SM0)>),
+    SM1(Rx<(P, SM1)>, Tx<(P, SM1)>),
+    SM2(Rx<(P, SM2)>, Tx<(P, SM2)>),
+    SM3(Rx<(P, SM3)>, Tx<(P, SM3)>),
+}
+
 pub struct Pio<P: PIOExt> {
     pio: PIO<P>,
     sm0: StateMachine<P, SM0>,
@@ -25,7 +30,7 @@ pub struct Pio<P: PIOExt> {
     in_use: bool,
 }
 
-impl<P: PIOExt + 'static> Pio<P> {
+impl<P: PIOExt> Pio<P> {
     pub fn new(pio: P, resets: &mut RESETS) -> Pio<P> {
         let (pio, sm0, sm1, sm2, sm3) = pio.split(resets);
 
@@ -44,7 +49,7 @@ impl<P: PIOExt + 'static> Pio<P> {
         &mut self, program: Program<32>,
         pins: [(u8, u8); NUM],
         clock_divisors: [(u16, u8); NUM],
-    ) -> Result<ArrayVec<(Rx, Tx), NUM>, Error> {
+    ) -> Result<ArrayVec<RxTx<P>, NUM>, Error> {
         if NUM > 4 {
             return Err(Error::TooManyStateMachinesRequested)
         }
@@ -63,7 +68,7 @@ impl<P: PIOExt + 'static> Pio<P> {
                 return Err(Error::BadStateMachineProgramming)
             };
 
-            rxtxs.push((rx, tx));
+            rxtxs.push(RxTx::SM0(rx, tx));
         }
 
         if NUM >= 2 {
@@ -75,7 +80,7 @@ impl<P: PIOExt + 'static> Pio<P> {
                 return Err(Error::BadStateMachineProgramming)
             };
 
-            rxtxs.push((rx, tx));
+            rxtxs.push(RxTx::SM1(rx, tx));
         }
 
         if NUM >= 3 {
@@ -87,7 +92,7 @@ impl<P: PIOExt + 'static> Pio<P> {
                 return Err(Error::BadStateMachineProgramming)
             };
 
-            rxtxs.push((rx, tx));
+            rxtxs.push(RxTx::SM2(rx, tx));
         }
 
         if NUM >= 4 {
@@ -99,42 +104,34 @@ impl<P: PIOExt + 'static> Pio<P> {
                 return Err(Error::BadStateMachineProgramming)
             };
 
-            rxtxs.push((rx, tx));
+            rxtxs.push(RxTx::SM3(rx, tx));
         }
 
         self.in_use = true;
         Ok(rxtxs)
     }
 
-    // /// Uninstalls a program
-    // ///
-    // /// * `rxtx` - The same rx and tx channels returned by install_program
-    // ///
-    // /// Returns a tuple with the tx and rx for each state machine.
-    // pub fn unininstall_program<const NUM: usize>(
-    //     &mut self,
-    //     rxtxs: ArrayVec<(Rx, Tx), NUM>
-    // ) -> Result<(), state_machine::Error> {
-	// 	if NUM > 0 {
-	// 		let (rx, tx) = rxtxs[0];
-	// 		self.sm0.uninstall(rx, tx);
-	// 	}
-	// 	if NUM > 1 {
-	// 		let (rx, tx) = rxtxs[1];
-	// 		self.sm1.uninstall(rx, tx);
-	// 	}
-	// 	if NUM > 2 {
-	// 		let (rx, tx) = rxtxs[2];
-	// 		self.sm2.uninstall(rx, tx);
-	// 	}
-	// 	if NUM > 3 {
-	// 		let (rx, tx) = rxtxs[3];
-	// 		self.sm3.uninstall(rx, tx);
-	// 	}
+    /// Uninstalls a program
+    ///
+    /// * `rxtx` - The same rx and tx channels returned by install_program
+    ///
+    /// Returns a tuple with the tx and rx for each state machine.
+    pub fn unininstall_program<const NUM: usize>(
+        &mut self,
+        rxtxs: ArrayVec<RxTx<P>, NUM>
+    ) -> Result<(), state_machine::Error> {
+        for rxtx in rxtxs {
+            match rxtx {
+                RxTx::SM0(rx, tx) => self.sm0.uninstall(rx, tx)?,
+                RxTx::SM1(rx, tx) => self.sm1.uninstall(rx, tx)?,
+                RxTx::SM2(rx, tx) => self.sm2.uninstall(rx, tx)?,
+                RxTx::SM3(rx, tx) => self.sm3.uninstall(rx, tx)?,
+            }
+        }
 
-    //     self.in_use = false;
-    //     Ok(())
-    // }
+        self.in_use = false;
+        Ok(())
+    }
 
     /// Returns whether or not this pio is in use
     pub fn in_use(&self) -> bool {

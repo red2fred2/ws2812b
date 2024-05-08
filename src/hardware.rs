@@ -4,7 +4,7 @@ use cortex_m::delay::Delay;
 use rp2040_hal::{clocks::init_clocks_and_plls, gpio::{FunctionPio0, Pin}, pac, usb::UsbBus, Clock, Sio, Watchdog};
 use usb_device::class_prelude::UsbBusAllocator;
 
-use crate::{pio::Pio, usb_manager::UsbManager};
+use crate::{pio::{Pio, RxTx}, usb_manager::UsbManager};
 
 static mut SINGLETON: Option<Hardware> = None;
 
@@ -74,7 +74,9 @@ impl Hardware {
             let clocks = [(5, 1)];
 
             let mut rxtxs = pio0.install_program(program, pin, clocks).unwrap();
-            let (_rx, mut tx) = rxtxs.pop().unwrap();
+            let RxTx::SM0(_rx, mut tx) = rxtxs.pop().unwrap() else {
+                unreachable!();
+            };
 
             let _ = pio0.start();
 
