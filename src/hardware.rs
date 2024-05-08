@@ -1,16 +1,18 @@
 //! Handles most low level hardware abstraction
 
 use cortex_m::delay::Delay;
-use rp2040_hal::{clocks::init_clocks_and_plls, gpio::{FunctionPio0, Pin}, pac, usb::UsbBus, Clock, Sio, Watchdog};
+use rp2040_hal::{clocks::init_clocks_and_plls, pac::{self, PIO0, PIO1}, usb::UsbBus, Clock, Sio, Watchdog};
 use usb_device::class_prelude::UsbBusAllocator;
 
-use crate::{pio::{Pio, RxTx}, usb_manager::UsbManager};
+use crate::{pio::Pio, usb_manager::UsbManager};
 
 static mut SINGLETON: Option<Hardware> = None;
 
 pub struct Hardware {
     delay: Delay,
-    // pins: rp2040_hal::gpio::Pins,
+    pins: rp2040_hal::gpio::Pins,
+    pio0: Pio<PIO0>,
+    pio1: Pio<PIO1>,
     usb: Option<UsbManager>,
     usb_bus: UsbBusAllocator<UsbBus>,
 }
@@ -62,30 +64,15 @@ impl Hardware {
                 &mut pac.RESETS,
             );
 
-
-            let mut pio0 = Pio::new(pac.PIO0, &mut pac.RESETS);
-            let _pio1 = Pio::new(pac.PIO1, &mut pac.RESETS);
-
-            let program = pio_proc::pio_file!("src/ws2812b.pio").program;
-
-            let _: Pin<_, FunctionPio0, _> = pins.gpio2.into_function();
-
-            let pin = [(2, 1)];
-            let clocks = [(5, 1)];
-
-            let mut rxtxs = pio0.install_program(program, pin, clocks).unwrap();
-            let RxTx::SM0(_rx, mut tx) = rxtxs.pop().unwrap() else {
-                unreachable!();
-            };
-
-            let _ = pio0.start();
-
-            tx.write(24 * 10);
+            let pio0 = Pio::new(pac.PIO0, &mut pac.RESETS);
+            let pio1 = Pio::new(pac.PIO1, &mut pac.RESETS);
 
             unsafe {
                 SINGLETON = Some(Hardware {
                     delay,
-                    // pins,
+                    pins,
+                    pio0,
+                    pio1,
                     usb: None,
                     usb_bus,
                 });
@@ -106,9 +93,17 @@ impl Hardware {
         &mut self.delay
     }
 
-    // pub fn get_pins(&mut self) -> &mut rp2040_hal::gpio::Pins {
-    //     &mut self.pins
-    // }
+    pub fn get_pins(&mut self) -> &mut rp2040_hal::gpio::Pins {
+        &mut self.pins
+    }
+
+	pub fn get_pio0(&mut self) -> &mut Pio<PIO0> {
+        &mut self.pio0
+    }
+
+	pub fn get_pio1(&mut self) -> &mut Pio<PIO1> {
+        &mut self.pio1
+    }
 
     pub fn get_usb(&mut self) -> &mut UsbManager {
         // It should be impossible for this to be None, panic if it is
