@@ -51,7 +51,9 @@ impl SerialLogger {
         let Some(hardware) = Hardware::get() else {
             return
         };
-        let usb = hardware.get_usb();
+		let Some(usb) = hardware.get_usb_mut() else {
+			return
+		};
 
         let result = usb.write_str("\x1b[0m\r\n");
 
@@ -66,7 +68,9 @@ impl SerialLogger {
         let Some(hardware) = Hardware::get() else {
             return
         };
-        let usb = hardware.get_usb();
+        let Some(usb) = hardware.get_usb_mut() else {
+			return
+		};
 
         let color_string = match level {
             Level::Error => "\x1b[31;1m",
@@ -89,7 +93,10 @@ impl SerialLogger {
         let Some(hardware) = Hardware::get() else {
             return
         };
-        let usb = hardware.get_usb();
+        let Some(usb) = hardware.get_usb_mut() else {
+			return
+		};
+
         let result = usb.write_fmt(*message);
 
         if result.is_err() {

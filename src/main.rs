@@ -45,7 +45,7 @@ fn main() -> ! {
         info!("Running for {number} seconds");
         number += 1;
 
-        hardware.get_delay().delay_ms(1000);
+        hardware.get_delay_mut().unwrap().delay_ms(1000);
     }
 }
 

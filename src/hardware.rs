@@ -1,5 +1,7 @@
 //! Handles most low level hardware abstraction
 
+use core::cell::RefCell;
+
 use cortex_m::delay::Delay;
 use rp2040_hal::{clocks::init_clocks_and_plls, pac::{self, PIO0, PIO1}, usb::UsbBus, Clock, Sio, Watchdog};
 use usb_device::class_prelude::UsbBusAllocator;
@@ -8,12 +10,17 @@ use crate::{pio::Pio, usb_manager::UsbManager};
 
 static mut SINGLETON: Option<Hardware> = None;
 
+#[derive(Debug)]
+pub enum Error {
+    AttemptToReturnExistingValue,
+}
+
 pub struct Hardware {
-    delay: Delay,
+    delay: RefCell<Option<Delay>>,
     pins: rp2040_hal::gpio::Pins,
-    pio0: Pio<PIO0>,
-    pio1: Pio<PIO1>,
-    usb: Option<UsbManager>,
+    pio0: RefCell<Option<Pio<PIO0>>>,
+    pio1: RefCell<Option<Pio<PIO1>>>,
+    usb: RefCell<Option<UsbManager>>,
     usb_bus: UsbBusAllocator<UsbBus>,
 }
 
@@ -69,17 +76,17 @@ impl Hardware {
 
             unsafe {
                 SINGLETON = Some(Hardware {
-                    delay,
+                    delay: RefCell::new(Some(delay)),
                     pins,
-                    pio0,
-                    pio1,
-                    usb: None,
+                    pio0: RefCell::new(Some(pio0)),
+                    pio1: RefCell::new(Some(pio1)),
+                    usb: RefCell::new(None),
                     usb_bus,
                 });
 
                 usb = UsbManager::new(&SINGLETON.as_ref().unwrap().usb_bus);
 
-                SINGLETON.as_mut().unwrap().usb = Some(usb);
+                SINGLETON.as_mut().unwrap().usb = RefCell::new(Some(usb));
             }
         })
     }
@@ -89,24 +96,83 @@ impl Hardware {
         unsafe { SINGLETON.as_mut() }
     }
 
-    pub fn get_delay(&mut self) -> &mut Delay {
-        &mut self.delay
+    ////////////////////////////////////////////////////////////////////////////
+    // Getters and setters
+    ////////////////////////////////////////////////////////////////////////////
+
+    pub fn get_delay_mut(&mut self) -> Option<&mut Delay> {
+        self.delay.get_mut().as_mut()
+    }
+
+    pub fn take_delay(&mut self) -> Option<Delay> {
+        self.delay.replace(None)
+    }
+
+    pub fn return_delay(&mut self, delay: Delay) -> Result<(), Error> {
+        if already_owned(&self.delay) {
+            return Err(Error::AttemptToReturnExistingValue);
+        }
+
+        self.delay.replace(Some(delay));
+        Ok(())
     }
 
     pub fn get_pins(&mut self) -> &mut rp2040_hal::gpio::Pins {
         &mut self.pins
     }
 
-    pub fn get_pio0(&mut self) -> &mut Pio<PIO0> {
-        &mut self.pio0
+    pub fn get_pio0_mut(&mut self) -> Option<&mut Pio<PIO0>> {
+        self.pio0.get_mut().as_mut()
     }
 
-    pub fn get_pio1(&mut self) -> &mut Pio<PIO1> {
-        &mut self.pio1
+    pub fn take_pio0(&mut self) -> Option<Pio<PIO0>> {
+        self.pio0.replace(None)
     }
 
-    pub fn get_usb(&mut self) -> &mut UsbManager {
-        // It should be impossible for this to be None, panic if it is
-        self.usb.as_mut().unwrap()
+    pub fn return_pio0(&mut self, pio0: Pio<PIO0>) -> Result<(), Error> {
+        if already_owned(&self.pio0) {
+            return Err(Error::AttemptToReturnExistingValue);
+        }
+
+        self.pio0.replace(Some(pio0));
+        Ok(())
     }
+
+    pub fn get_pio1_mut(&mut self) -> Option<&mut Pio<PIO1>> {
+        self.pio1.get_mut().as_mut()
+    }
+
+    pub fn take_pio1(&mut self) -> Option<Pio<PIO1>> {
+        self.pio1.replace(None)
+    }
+
+    pub fn return_pio1(&mut self, pio1: Pio<PIO1>) -> Result<(), Error> {
+        if already_owned(&self.pio1) {
+            return Err(Error::AttemptToReturnExistingValue);
+        }
+
+        self.pio1.replace(Some(pio1));
+        Ok(())
+    }
+
+    pub fn get_usb_mut(&mut self) -> Option<&mut UsbManager> {
+        self.usb.get_mut().as_mut()
+    }
+
+    pub fn take_usb(&mut self) -> Option<UsbManager> {
+        self.usb.replace(None)
+    }
+
+    pub fn return_usb(&mut self, usb: UsbManager) -> Result<(), Error> {
+        if already_owned(&self.usb) {
+            return Err(Error::AttemptToReturnExistingValue);
+        }
+
+        self.usb.replace(Some(usb));
+        Ok(())
+    }
+}
+
+fn already_owned<T>(data: &RefCell<Option<T>>) -> bool {
+    data.borrow().as_ref().is_some()
 }

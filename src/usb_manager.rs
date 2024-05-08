@@ -58,5 +58,9 @@ unsafe fn USBCTRL_IRQ() {
         return
     };
 
-    hardware.get_usb().interrupt()
+	let Some(usb_manager) = hardware.get_usb_mut() else {
+		return
+	};
+
+    usb_manager.interrupt()
 }
