@@ -11,7 +11,6 @@ extern crate cortex_m_rt;
 extern crate alloc;
 
 pub mod hardware;
-    use core::mem::MaybeUninit;
 pub mod pio;
 pub mod tx;
 pub mod rx;
@@ -19,6 +18,7 @@ pub mod serial_logger;
 pub mod state_machine;
 pub mod usb_manager;
 
+use core::mem::MaybeUninit;
 use embedded_alloc::Heap;
 use hardware::Hardware;
 use log::info;
